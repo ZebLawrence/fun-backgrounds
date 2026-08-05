@@ -1,0 +1,13 @@
+{
+  "name": "fun-backgrounds",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Background images, kept as quality-100 JPEGs converted from the PNG sources in RAW/",
+  "scripts": {
+    "convert": "node scripts/convert-raw.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}
