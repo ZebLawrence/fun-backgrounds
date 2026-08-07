@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Convert the full-size PNG sources in RAW/ into quality-100 JPEGs at the repo root.
+ * Convert the full-size PNG sources in RAW/ into quality-80 JPEGs at the repo root.
  *
- * RAW/ is gitignored; the JPEGs it produces are what actually gets committed.
+ * RAW/ is gitignored and holds the lossless masters, which stay on this machine.
+ * The JPEGs it produces are what actually gets committed.
  * Output keeps the source basename and the source dimensions - no resizing.
  *
  * By default a PNG is skipped when its JPEG already exists and is newer than
@@ -21,7 +22,12 @@ const rawDir = path.join(repoRoot, 'RAW');
 
 // 4:2:0 matches the JPEGs already committed to this repo. '4:4:4' would skip
 // chroma subsampling entirely at the cost of a noticeably larger file.
-const JPEG_OPTIONS = { quality: 100, chromaSubsampling: '4:2:0' };
+//
+// Quality dropped 100 -> 80 on 2026-08-07. Measured on a real 5504x3072 frame:
+// q100 13.5 MB, q95 6.8, q90 4.5, q85 3.4, q80 2.8, q75 2.4. q80 is ~21% of q100
+// for no visible loss at this resolution, which takes repo growth from roughly
+// 4.4 GB/year to under 1 GB/year. The lossless PNG master stays in RAW/.
+const JPEG_OPTIONS = { quality: 80, chromaSubsampling: '4:2:0' };
 
 const force = process.argv.includes('--force');
 

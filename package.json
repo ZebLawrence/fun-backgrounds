@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Background images, kept as quality-100 JPEGs converted from the PNG sources in RAW/",
+  "description": "Background images, kept as quality-80 JPEGs converted from the lossless PNG masters in RAW/ (masters stay local)",
   "scripts": {
     "convert": "node scripts/convert-raw.mjs"
   },
