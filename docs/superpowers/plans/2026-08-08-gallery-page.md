@@ -492,19 +492,21 @@ git commit -m "Add gallery thumbnail and manifest build script"
 
 ### Task 3: Generate the real thumbnails and manifest
 
-No tests here — this runs the script just built against the actual 39 images and commits the output.
+No tests here — this runs the script just built against the actual images and commits the output.
+
+At the time of writing there are **40** JPEGs totalling **287 MB**, but a new daily may land at any time. Every check below derives the expected count rather than hardcoding it, so treat `N` as whatever `ls *.jpg | wc -l` reports.
 
 **Files:**
-- Create: `thumbs/*.webp` (39 files, generated)
+- Create: `thumbs/*.webp` (one per root JPEG, generated)
 - Create: `gallery.json` (generated)
 
-- [ ] **Step 1: Run the build**
+- [ ] **Step 1: Note the count, then run the build**
 
 ```bash
-npm run gallery
+ls *.jpg | wc -l && npm run gallery
 ```
 
-Expected: 39 `build thumbs/...` lines, then `39 built, 0 skipped, 0 failed - 39 images in gallery.json`.
+Expected: `N` `build thumbs/...` lines, then `N built, 0 skipped, 0 failed - N images in gallery.json`, with the same `N` the first command reported.
 
 - [ ] **Step 2: Verify the output size is in the expected range**
 
@@ -512,15 +514,15 @@ Expected: 39 `build thumbs/...` lines, then `39 built, 0 skipped, 0 failed - 39 
 du -sh thumbs && ls thumbs | wc -l
 ```
 
-Expected: about **1.7 MB** across **39** files. If it comes out dramatically larger, stop and re-check `THUMB_OPTIONS` before committing — this is the number that keeps the page light.
+Expected: **`N` files at roughly 43 KB each** — about 1.7 MB for 40 images. If the total comes out dramatically larger, stop and re-check `THUMB_OPTIONS` before committing; this number is what keeps the page light.
 
 - [ ] **Step 3: Verify the manifest looks right**
 
 ```bash
-node -e "const m=require('./gallery.json'); console.log(m.length, m[0].file, m[0].width+'x'+m[0].height); console.log(m.at(-1).file)"
+node -e "const m=require('./gallery.json'); console.log(m.length); console.log('first:', m[0].file, m[0].width+'x'+m[0].height); console.log('last: ', m.at(-1).file)"
 ```
 
-Expected: `39`, first entry `2026-08-08-ritual-transplant-moomba-wake-boat-forbidden-forest.jpg` at `5504x3072`, last entry one of the `ElevenLabs_*` files.
+Expected: length `N`; the first entry is the highest-sorting dated filename (currently `2026-08-08-trade-view-new-york-2263-air-canyons-cylon-centurion.jpg`, which sorts above the `ritual-transplant` image from the same day); the last entry is an `ElevenLabs_*` file.
 
 - [ ] **Step 4: Confirm a second run is a no-op**
 
@@ -528,7 +530,7 @@ Expected: `39`, first entry `2026-08-08-ritual-transplant-moomba-wake-boat-forbi
 npm run gallery
 ```
 
-Expected: `0 built, 39 skipped, 0 failed`.
+Expected: `0 built, N skipped, 0 failed`.
 
 - [ ] **Step 5: Commit**
 
@@ -861,9 +863,9 @@ Run with `run_in_background: true`. Expected: `http://localhost:5173`.
 Use `mcp__Claude_Browser__preview_start` with `url: "http://localhost:5173"`, then take a screenshot.
 
 Confirm, and report each explicitly:
-1. The header reads `39 backgrounds · 0.28 GB at full size`
+1. The header reads `N backgrounds · 0.28 GB at full size`, with `N` matching `ls *.jpg | wc -l`
 2. The grid renders in multiple columns with no broken images and no visible layout shift while scrolling
-3. The newest daily (`2026-08-08-ritual-transplant-moomba-wake-boat-forbidden-forest.jpg`) is the first tile
+3. The first tile is the highest-sorting dated filename (currently `2026-08-08-trade-view-new-york-2263-air-canyons-cylon-centurion.jpg`)
 4. The `ElevenLabs_*` files are at the very bottom
 5. `mcp__Claude_Browser__read_console_messages` reports no errors
 
@@ -906,21 +908,29 @@ If nothing needed fixing, there is nothing to commit — say so rather than inve
 
 ---
 
-### Task 6: Turn on GitHub Pages
+### Task 6: Open the PR, then turn on GitHub Pages
 
-Enabling Pages publishes the repo's contents to a public URL. **Do not run this without confirming with the user first** — it is an outward-facing change, and the repo's visibility determines whether the images become publicly reachable.
+The work is on the `gallery` branch, which is based on `origin/main` at `b66ee61`. It ships as a pull request, not a direct push to `main`.
 
-- [ ] **Step 1: Push the work**
+Enabling Pages publishes the repo's contents to a public URL. **Do not enable it without confirming with the user first** — it is an outward-facing change, and the repo's visibility determines whether the images become publicly reachable. Pages should only be turned on **after the PR is merged**, since it serves from `main`.
+
+- [ ] **Step 1: Push the branch and open the PR**
 
 ```bash
-git push origin main
+git push -u origin gallery
 ```
 
-- [ ] **Step 2: Confirm with the user**
+Then open a PR against `main` summarising: the build script and its tests, the generated thumbnails and manifest, the page itself, and the fact that Pages still needs enabling as a follow-up.
+
+- [ ] **Step 2: Stop here and hand back to the user**
+
+The PR is the deliverable for this plan. Merging it, and everything below, is the user's call. Do not merge on their behalf.
+
+- [ ] **Step 3: After the PR is merged, confirm with the user**
 
 Ask whether to enable Pages, and confirm whether the repo is public or private. On a private repo, Pages requires a paid plan; if it is private and unpaid, stop here and report that.
 
-- [ ] **Step 3: Enable Pages, after confirmation**
+- [ ] **Step 4: Enable Pages, after confirmation**
 
 ```bash
 gh api -X POST repos/ZebLawrence/fun-backgrounds/pages -f "source[branch]=main" -f "source[path]=/"
@@ -932,7 +942,7 @@ If it returns 409, Pages is already enabled — switch it instead:
 gh api -X PUT repos/ZebLawrence/fun-backgrounds/pages -f "source[branch]=main" -f "source[path]=/"
 ```
 
-- [ ] **Step 4: Verify the deploy**
+- [ ] **Step 5: Verify the deploy**
 
 ```bash
 gh api repos/ZebLawrence/fun-backgrounds/pages --jq '.status, .html_url'
