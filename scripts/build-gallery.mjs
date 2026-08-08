@@ -23,6 +23,9 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 // 640 is roughly 2x the ~320px grid tile, so thumbnails stay sharp on retina
 // without the page getting heavy. Measured on a real 5504x3072 frame, a 640px
 // WebP lands at 39.7 KB at q68, 42.5 at q72, 48.8 at q78 - q72 is the knee.
+//
+// The skip below is mtime-only, so changing either of these regenerates
+// nothing on its own: re-encode with `npm run gallery -- --force`.
 const THUMB_WIDTH = 640;
 const THUMB_OPTIONS = { quality: 72 };
 
