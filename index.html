@@ -71,18 +71,18 @@
     font-size: .85rem;
   }
 
+  /* Name on its own full-width line. Sharing a row with the dimensions cropped
+     it at roughly the date prefix, hiding the part that identifies the image. */
   .meta {
     display: flex;
-    align-items: center;
-    gap: .75rem;
+    flex-direction: column;
+    gap: .15rem;
     padding: .6rem .75rem;
     border-top: 1px solid var(--border);
   }
   .name {
-    flex: 1;
-    min-width: 0;
     font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: var(--muted);
+    color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
