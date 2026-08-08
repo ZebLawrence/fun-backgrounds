@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Background images, kept as quality-80 JPEGs converted from the lossless PNG masters in RAW/ (masters stay local)",
   "scripts": {
-    "convert": "node scripts/convert-raw.mjs"
+    "convert": "node scripts/convert-raw.mjs",
+    "gallery": "node scripts/build-gallery.mjs",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "sharp": "^0.35.3"
