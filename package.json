@@ -7,7 +7,7 @@
   "scripts": {
     "convert": "node scripts/convert-raw.mjs",
     "gallery": "node scripts/build-gallery.mjs",
-    "test": "node --test tests/"
+    "test": "node --test"
   },
   "dependencies": {
     "sharp": "^0.35.3"

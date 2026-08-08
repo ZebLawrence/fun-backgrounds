@@ -6,6 +6,12 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { buildGallery } from '../scripts/build-gallery.mjs';
 
+// sharp's operation cache keeps a file handle open on images it has read, which
+// on Windows makes the temp-directory cleanup below fail with EBUSY when a test
+// reads a thumbnail back before removing the directory. The cache buys nothing
+// here - every test works on its own fresh fixture.
+sharp.cache(false);
+
 /** A solid-colour JPEG of the given size, so tests stay fast and self-contained. */
 async function writeJpeg(dir, name, width, height) {
   await sharp({
