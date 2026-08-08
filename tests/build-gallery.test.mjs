@@ -44,7 +44,41 @@ test('builds a thumbnail and a manifest entry for every root JPEG', async (t) =>
     const thumb = await sharp(path.join(dir, entry.thumb)).metadata();
     assert.equal(thumb.format, 'webp');
     assert.equal(thumb.width, 640);
+    // Height too, or a resize that squashed everything into a fixed box would
+    // pass. The grid relies on the thumbnail keeping the source's shape.
+    assert.equal(thumb.height, Math.round((640 * entry.height) / entry.width));
   }
+});
+
+test('manifest paths use forward slashes so they work as URLs', async (t) => {
+  const dir = await fixture();
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  const { manifest } = await buildGallery({ rootDir: dir });
+
+  // The manifest is consumed by a browser, not by the filesystem, so a
+  // backslash from path.join leaking into it would break every thumbnail.
+  for (const entry of manifest) {
+    assert.ok(!entry.thumb.includes('\\'), `backslash in ${entry.thumb}`);
+    assert.ok(entry.thumb.startsWith('thumbs/'), `unexpected path ${entry.thumb}`);
+  }
+});
+
+test('filenames containing spaces are handled', async (t) => {
+  const dir = await fixture();
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  // Ten real files in this repo have spaces in their names.
+  const spacey = 'Firefly_Gemini Flash_some prompt text 468075.jpg';
+  await writeJpeg(dir, spacey, 640, 480);
+
+  const { counts, manifest } = await buildGallery({ rootDir: dir });
+  const entry = manifest.find((e) => e.file === spacey);
+
+  assert.equal(counts.failed, 0);
+  assert.equal(entry.thumb, 'thumbs/Firefly_Gemini Flash_some prompt text 468075.webp');
+  const thumb = await sharp(path.join(dir, entry.thumb)).metadata();
+  assert.equal(thumb.format, 'webp');
 });
 
 test('manifest entries carry the full-size dimensions and byte count', async (t) => {
@@ -95,11 +129,20 @@ test('a second run skips every thumbnail but still rewrites the manifest', async
   t.after(() => rm(dir, { recursive: true, force: true }));
 
   await buildGallery({ rootDir: dir });
+
+  // Delete the manifest so the second run has to write it back. Asserting on
+  // the returned manifest alone would pass even if the write were skipped
+  // whenever nothing was encoded, which is the regression this guards.
+  await rm(path.join(dir, 'gallery.json'));
+
   const second = await buildGallery({ rootDir: dir });
 
   assert.equal(second.counts.built, 0);
   assert.equal(second.counts.skipped, 3);
-  assert.equal(second.manifest.length, 3);
+
+  const onDisk = JSON.parse(await readFile(path.join(dir, 'gallery.json'), 'utf8'));
+  assert.deepEqual(onDisk, second.manifest);
+  assert.equal(onDisk.length, 3);
 });
 
 test('a source newer than its thumbnail is rebuilt', async (t) => {

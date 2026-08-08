@@ -105,6 +105,10 @@
   }
   .actions a:hover, .actions button:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* #grid sets display:grid, which beats the UA stylesheet's [hidden] rule -
+     without this the hidden attribute on the list does nothing. */
+  #grid[hidden] { display: none; }
+
   #status { color: var(--muted); padding: 2rem 0; }
   #status.error { color: #ff9c8a; }
 </style>
@@ -130,9 +134,20 @@ function formatSize(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+/**
+ * Percent-encode a manifest path for use as a URL, segment by segment so the
+ * separator survives. The URL parser already handles spaces, which plenty of
+ * the legacy filenames contain, but it leaves '#' and '%' alone - a '#' would
+ * truncate the path at a fragment and a stray '%' can misdecode.
+ */
+function urlFor(pathname) {
+  return pathname.split('/').map(encodeURIComponent).join('/');
+}
+
 /** Absolute URL for an image, so a copied link works pasted anywhere. */
 function absoluteUrl(file) {
-  return new URL(file, location.href).href;
+  // new URL leaves existing %XX escapes intact, so encoding first is safe.
+  return new URL(urlFor(file), location.href).href;
 }
 
 async function copyToClipboard(text) {
@@ -159,19 +174,21 @@ function buildTile(entry) {
 
   const shot = document.createElement('a');
   shot.className = 'shot';
-  shot.href = entry.file;
+  shot.href = urlFor(entry.file);
   shot.target = '_blank';
   shot.rel = 'noopener';
   shot.style.aspectRatio = `${entry.width} / ${entry.height}`;
 
   const img = document.createElement('img');
-  img.src = entry.thumb;
   img.alt = entry.file;
   img.loading = 'lazy';
   img.decoding = 'async';
   // A missing thumbnail leaves the reserved box and a label rather than a
   // broken-image icon. The links below still work.
   img.addEventListener('error', () => shot.classList.add('missing'));
+  // src goes last: assigning it can start the fetch immediately, so loading
+  // and the error listener have to be in place before that happens.
+  img.src = urlFor(entry.thumb);
   shot.appendChild(img);
 
   const meta = document.createElement('div');
@@ -192,8 +209,8 @@ function buildTile(entry) {
   actions.className = 'actions';
 
   const download = document.createElement('a');
-  download.href = entry.file;
-  download.download = entry.file;
+  download.href = urlFor(entry.file);
+  download.download = entry.file; // the raw name is the filename hint, not a URL
   download.textContent = 'Download';
 
   const copy = document.createElement('button');
@@ -220,6 +237,7 @@ async function render() {
     const response = await fetch('gallery.json', { cache: 'no-cache' });
     if (!response.ok) throw new Error(`gallery.json returned ${response.status}`);
     manifest = await response.json();
+    if (!Array.isArray(manifest)) throw new Error('gallery.json is not an array');
   } catch (error) {
     status.className = 'error';
     status.textContent = `Could not load the gallery: ${error.message}`;
