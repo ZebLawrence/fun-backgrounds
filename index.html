@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fun-backgrounds</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d0f12;
+    --surface: #16191e;
+    --border: #262b33;
+    --text: #e8eaed;
+    --muted: #939ca7;
+    --accent: #7cc4ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 0 1.5rem; }
+  header { padding: 2.5rem 0 1.25rem; }
+  h1 { margin: 0 0 .35rem; font-size: 1.4rem; letter-spacing: -.01em; }
+  header p { margin: 0; color: var(--muted); font-size: .9rem; }
+  main { padding-bottom: 4rem; }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .shot {
+    display: block;
+    position: relative;
+    background: #000;
+    /* aspect-ratio is set inline per image, from the manifest dimensions, so
+       the box is reserved before the thumbnail loads and the handful of
+       non-16:9 images are not cropped. */
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: 0;
+  }
+  .shot.missing { background: var(--surface); }
+  .shot.missing img { display: none; }
+  .shot.missing::after {
+    content: "thumbnail unavailable";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem .75rem;
+    border-top: 1px solid var(--border);
+  }
+  .name {
+    flex: 1;
+    min-width: 0;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .size { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  .actions { display: flex; gap: .4rem; padding: 0 .75rem .75rem; }
+  .actions a, .actions button {
+    flex: 1;
+    padding: .4rem .5rem;
+    font: inherit;
+    font-size: 13px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .actions a:hover, .actions button:hover { border-color: var(--accent); color: var(--accent); }
+
+  #status { color: var(--muted); padding: 2rem 0; }
+  #status.error { color: #ff9c8a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>fun-backgrounds</h1>
+    <p id="count">Loading&hellip;</p>
+  </header>
+  <main>
+    <p id="status">Loading&hellip;</p>
+    <ul id="grid" hidden></ul>
+  </main>
+</div>
+
+<script>
+const grid = document.getElementById('grid');
+const status = document.getElementById('status');
+const count = document.getElementById('count');
+
+function formatSize(bytes) {
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+/** Absolute URL for an image, so a copied link works pasted anywhere. */
+function absoluteUrl(file) {
+  return new URL(file, location.href).href;
+}
+
+async function copyToClipboard(text) {
+  // navigator.clipboard needs a secure context; file:// and plain http on a
+  // non-localhost host fall back to the old textarea trick.
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.appendChild(field);
+  field.select();
+  document.execCommand('copy');
+  field.remove();
+}
+
+function buildTile(entry) {
+  const tile = document.createElement('li');
+  tile.className = 'tile';
+
+  const shot = document.createElement('a');
+  shot.className = 'shot';
+  shot.href = entry.file;
+  shot.target = '_blank';
+  shot.rel = 'noopener';
+  shot.style.aspectRatio = `${entry.width} / ${entry.height}`;
+
+  const img = document.createElement('img');
+  img.src = entry.thumb;
+  img.alt = entry.file;
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  // A missing thumbnail leaves the reserved box and a label rather than a
+  // broken-image icon. The links below still work.
+  img.addEventListener('error', () => shot.classList.add('missing'));
+  shot.appendChild(img);
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = entry.file;
+  name.title = entry.file;
+
+  const size = document.createElement('span');
+  size.className = 'size';
+  size.textContent = `${entry.width}×${entry.height} · ${formatSize(entry.bytes)}`;
+
+  meta.append(name, size);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+
+  const download = document.createElement('a');
+  download.href = entry.file;
+  download.download = entry.file;
+  download.textContent = 'Download';
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.textContent = 'Copy link';
+  copy.addEventListener('click', async () => {
+    try {
+      await copyToClipboard(absoluteUrl(entry.file));
+      copy.textContent = 'Copied';
+    } catch {
+      copy.textContent = 'Copy failed';
+    }
+    setTimeout(() => { copy.textContent = 'Copy link'; }, 1500);
+  });
+
+  actions.append(download, copy);
+  tile.append(shot, meta, actions);
+  return tile;
+}
+
+async function render() {
+  let manifest;
+  try {
+    const response = await fetch('gallery.json', { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`gallery.json returned ${response.status}`);
+    manifest = await response.json();
+  } catch (error) {
+    status.className = 'error';
+    status.textContent = `Could not load the gallery: ${error.message}`;
+    count.textContent = '';
+    return;
+  }
+
+  const total = manifest.reduce((sum, entry) => sum + entry.bytes, 0);
+  count.textContent =
+    `${manifest.length} background${manifest.length === 1 ? '' : 's'}` +
+    ` · ${(total / 1073741824).toFixed(2)} GB at full size`;
+
+  grid.append(...manifest.map(buildTile));
+  status.remove();
+  grid.hidden = false;
+}
+
+render();
+</script>
+</body>
+</html>
