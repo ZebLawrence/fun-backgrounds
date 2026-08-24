@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fun-backgrounds slideshow</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: #000;
+    color: #e8eaed;
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  /* Two stacked layers; the incoming image fades in over the outgoing one. */
+  .layer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 1.8s ease-in-out;
+  }
+  .layer.visible { opacity: 1; }
+
+  #caption {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 2.5rem 1.25rem .9rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .65));
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: rgba(232, 234, 237, .85);
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .8);
+    opacity: 1;
+    transition: opacity .6s ease;
+    pointer-events: none;
+  }
+  /* The caption (and cursor, via the idle class) hides after a few idle
+     seconds so the slideshow can run clean as an ambient display. */
+  body.idle #caption { opacity: 0; }
+  body.idle { cursor: none; }
+
+  #status {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #939ca7;
+  }
+  #status.error { color: #ff9c8a; }
+  #status[hidden] { display: none; }
+</style>
+</head>
+<body>
+<img class="layer" alt="">
+<img class="layer" alt="">
+<p id="status">Loading&hellip;</p>
+<div id="caption" hidden></div>
+
+<script>
+const DISPLAY_MS = 7000; // time each image stays fully visible
+const layers = document.querySelectorAll('.layer');
+const status = document.getElementById('status');
+const caption = document.getElementById('caption');
+
+/* Same segment-wise encoding as index.html: keeps '/' as the separator while
+   escaping '#' and '%', which the URL parser would otherwise misread. */
+function urlFor(pathname) {
+  return pathname.split('/').map(encodeURIComponent).join('/');
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(file);
+    img.onerror = () => reject(new Error(`could not load ${file}`));
+    img.src = urlFor(file);
+  });
+}
+
+async function run() {
+  let manifest;
+  try {
+    const response = await fetch('gallery.json', { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`gallery.json returned ${response.status}`);
+    manifest = await response.json();
+    if (!Array.isArray(manifest) || manifest.length === 0) {
+      throw new Error('gallery.json has no entries');
+    }
+  } catch (error) {
+    status.className = 'error';
+    status.textContent = `Could not load the gallery: ${error.message}`;
+    return;
+  }
+
+  const files = manifest.map(entry => entry.file);
+  let index = 0;   // position in files of the image about to be shown
+  let front = 0;   // which layer is currently visible
+
+  const show = (file) => {
+    const incoming = layers[front ^ 1];
+    incoming.src = urlFor(file);
+    incoming.classList.add('visible');
+    layers[front].classList.remove('visible');
+    front ^= 1;
+    caption.textContent = file;
+  };
+
+  // First image: wait for it, then start. Full-size files run megabytes each,
+  // so every advance waits for the next image to finish downloading before
+  // fading - the timer only guarantees a minimum display time.
+  try {
+    await loadImage(files[0]);
+  } catch (error) {
+    status.className = 'error';
+    status.textContent = error.message;
+    return;
+  }
+  status.hidden = true;
+  caption.hidden = false;
+  show(files[0]);
+
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  while (true) {
+    const next = (index + 1) % files.length;
+    // Preload during the display window; skip images that fail to load
+    // rather than stalling the loop on one bad file.
+    const [loaded] = await Promise.allSettled([loadImage(files[next]), delay(DISPLAY_MS)]);
+    index = next;
+    if (loaded.status === 'fulfilled') show(files[index]);
+  }
+}
+
+/* Hide the caption and cursor after 4s without mouse movement. */
+let idleTimer;
+function wake() {
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add('idle'), 4000);
+}
+addEventListener('mousemove', wake);
+wake();
+
+run();
+</script>
+</body>
+</html>
